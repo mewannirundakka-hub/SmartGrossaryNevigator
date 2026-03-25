@@ -1,0 +1,1349 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+    <title>Smart Grocery Finder</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet"/>
+    <style>
+        :root {
+          --white:#fff; --bg:#f4f6f1; --bg2:#eaede5; --surface:#fff; --surface2:#f7f9f4;
+          --border:#dde3d6; --border2:#ccd5c2;
+          --g50:#f0faf3; --g100:#d4f2de; --g200:#a4e4bc; --g300:#5cc98a;
+          --g400:#2da653; --g500:#1e8a40; --g600:#166332;
+          --orange:#f97316; --orange-lt:#fff4ed;
+          --blue:#3b82f6; --blue-lt:#eff6ff; --blue-dark:#1d4ed8;
+          --red:#ef4444; --red-lt:#fef2f2;
+          --amber:#f59e0b; --amber-lt:#fffbeb;
+          --t900:#1a2114; --t700:#3a4828; --t500:#637050; --t400:#8a9a72; --t300:#b2c196;
+          --font:'Outfit',sans-serif; --mono:'JetBrains Mono',monospace;
+          --r:8px; --r-lg:12px; --r-xl:16px;
+          --sh-sm:0 1px 3px rgba(20,40,10,.07),0 1px 2px rgba(20,40,10,.04);
+          --sh:0 3px 10px rgba(20,40,10,.09),0 1px 3px rgba(20,40,10,.05);
+          --sh-lg:0 8px 24px rgba(20,40,10,.12),0 3px 6px rgba(20,40,10,.07);
+          --hdr:48px;
+          --sidebar:220px;
+        }
+        *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+        html,body{height:100%;overflow:hidden}
+        body{background:var(--bg);color:var(--t900);font-family:var(--font);font-size:13px;line-height:1.45;-webkit-font-smoothing:antialiased}
+
+        /* ── Shell: fixed full-viewport grid ── */
+        .shell{
+          display:grid;
+          grid-template-columns:var(--sidebar) 1fr;
+          grid-template-rows:var(--hdr) 1fr;
+          grid-template-areas:"hd hd""sb mn";
+          height:100vh;
+          overflow:hidden;
+        }
+
+        /* ── Header ── */
+        header{
+          grid-area:hd;height:var(--hdr);
+          background:var(--white);border-bottom:1px solid var(--border);
+          display:flex;align-items:center;padding:0 16px;gap:10px;
+          position:sticky;top:0;z-index:300;box-shadow:var(--sh-sm);
+        }
+        .hdr-logo{width:28px;height:28px;background:linear-gradient(135deg,var(--g400),var(--g300));border-radius:8px;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 6px rgba(45,166,83,.28);flex-shrink:0}
+        .hdr-text{display:flex;flex-direction:column;line-height:1.1}
+        .hdr-title{font-weight:800;font-size:13px;color:var(--t900);letter-spacing:-.02em}
+        .hdr-sub{font-size:10px;color:var(--t400);font-weight:500}
+        .hdr-right{margin-left:auto}
+        .api-pill{display:flex;align-items:center;gap:5px;background:var(--g50);border:1px solid var(--g200);border-radius:99px;padding:3px 10px;font-family:var(--mono);font-size:10px;color:var(--g500);font-weight:500}
+        .live-dot{width:6px;height:6px;border-radius:50%;background:var(--g300);animation:livepulse 2s ease-in-out infinite}
+        @keyframes livepulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.45;transform:scale(.75)}}
+
+        /* ── Sidebar: scrollable, fixed height ── */
+        aside{
+          grid-area:sb;background:var(--white);border-right:1px solid var(--border);
+          padding:10px 8px 60px;
+          height:calc(100vh - var(--hdr));
+          overflow-y:auto;
+          position:relative;
+        }
+        .nav-lbl{font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--t300);padding:8px 8px 4px}
+        .nav-btn{width:100%;display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:var(--r);background:transparent;border:none;cursor:pointer;font-family:var(--font);font-size:12px;font-weight:600;color:var(--t500);transition:all .12s;text-align:left;margin-bottom:1px}
+        .nav-btn:hover{background:var(--bg2);color:var(--t700)}
+        .nav-btn.active{background:var(--g50);color:var(--g500);border:1px solid var(--g100)}
+        .nav-ico{width:24px;height:24px;border-radius:6px;display:flex;align-items:center;justify-content:center;background:var(--bg2);flex-shrink:0;transition:background .12s}
+        .nav-ico svg{width:13px;height:13px}
+        .nav-btn.active .nav-ico{background:var(--g100)}
+        .nav-badge{margin-left:auto;background:var(--g400);color:#fff;font-size:9px;font-weight:700;padding:1px 6px;border-radius:99px;min-width:16px;text-align:center;display:none}
+        .nav-badge.show{display:block}
+        .sb-footer{position:absolute;bottom:0;left:0;right:0;padding:10px;border-top:1px solid var(--border);background:var(--white);text-align:center;font-size:10px;color:var(--t300);font-family:var(--mono)}
+
+        /* ── Main: scrollable content area ── */
+        main{
+          grid-area:mn;
+          height:calc(100vh - var(--hdr));
+          overflow-y:auto;
+          padding:14px 18px 20px;
+        }
+        .panel{display:none}
+        .panel.active{display:flex;flex-direction:column;height:100%;animation:fadeup .15s ease}
+        @keyframes fadeup{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
+
+        /* Page header */
+        .pg-hdr{flex-shrink:0;margin-bottom:10px}
+        .pg-hdr-row{display:flex;align-items:center;justify-content:space-between;gap:10px}
+        .pg-title{font-size:17px;font-weight:800;letter-spacing:-.02em;margin-bottom:2px}
+        .pg-sub{font-size:10px;color:var(--t400);font-family:var(--mono);display:flex;align-items:center;gap:4px;flex-wrap:wrap}
+        .rc{display:inline-block;background:var(--bg2);border:1px solid var(--border2);border-radius:4px;padding:1px 5px;font-family:var(--mono);font-size:10px;color:var(--t500)}
+
+        /* Scrollable panel body */
+        .panel-scroll{flex:1;overflow-y:auto;min-height:0;display:flex;flex-direction:column;gap:0}
+
+        /* ── Cards ── */
+        .card{background:var(--white);border:1px solid var(--border);border-radius:var(--r-lg);padding:12px 14px;margin-bottom:10px;box-shadow:var(--sh-sm);flex-shrink:0}
+        .card-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+        .card-title{font-size:11.5px;font-weight:700;color:var(--t700);display:flex;align-items:center;gap:6px}
+        .card-ico{width:22px;height:22px;border-radius:5px;background:var(--g50);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+        .card-ico svg{width:12px;height:12px}
+
+        /* ── Forms ── */
+        .fg{display:grid;gap:8px}
+        .fg2{grid-template-columns:1fr 1fr}
+        .fg3{grid-template-columns:1fr 1fr 1fr}
+        .fga{grid-template-columns:1fr auto}
+        .field{display:flex;flex-direction:column;gap:3px}
+        label{font-size:11px;font-weight:600;color:var(--t700);letter-spacing:.01em}
+        input[type=text],input[type=number],select{
+          background:var(--surface2);border:1.5px solid var(--border);border-radius:var(--r);
+          color:var(--t900);font-family:var(--font);font-size:12px;font-weight:500;
+          padding:6px 10px;outline:none;transition:border-color .14s,box-shadow .14s,background .14s;width:100%;
+        }
+        input:hover:not(:focus),select:hover:not(:focus){border-color:var(--border2);background:var(--white)}
+        input:focus,select:focus{border-color:var(--g400)!important;background:var(--white)!important;box-shadow:0 0 0 3px rgba(45,166,83,.1);outline:none}
+        input::placeholder{color:var(--t300)}
+
+        /* ── Buttons ── */
+        .btn{display:inline-flex;align-items:center;gap:5px;padding:6px 13px;border-radius:var(--r);font-family:var(--font);font-size:11.5px;font-weight:600;cursor:pointer;border:none;transition:all .12s;white-space:nowrap;letter-spacing:-.01em}
+        .btn:disabled{opacity:.4;cursor:not-allowed}
+        .btn-sm{padding:4px 9px;font-size:11px}
+        .btn-primary{background:linear-gradient(135deg,var(--g400),var(--g300));color:#fff;box-shadow:0 2px 7px rgba(45,166,83,.25)}
+        .btn-primary:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 4px 12px rgba(45,166,83,.3);filter:brightness(1.05)}
+        .btn-outline{background:var(--white);color:var(--g500);border:1.5px solid var(--g200)}
+        .btn-outline:hover:not(:disabled){background:var(--g50);border-color:var(--g300)}
+        .btn-ghost{background:var(--bg2);color:var(--t700);border:1.5px solid var(--border)}
+        .btn-ghost:hover:not(:disabled){background:var(--border);color:var(--t900)}
+        .btn-danger{background:var(--red-lt);color:var(--red);border:1.5px solid #fecaca}
+        .btn-danger:hover:not(:disabled){background:#fee2e2}
+        .btn-orange{background:linear-gradient(135deg,var(--orange),#fb923c);color:#fff;box-shadow:0 2px 7px rgba(249,115,22,.2)}
+        .btn-orange:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 4px 12px rgba(249,115,22,.25)}
+        .btn-row{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap;align-items:center}
+
+        /* ── Tables ── */
+        .tbl-wrap{overflow-x:auto;border-radius:var(--r);border:1px solid var(--border)}
+        table{width:100%;border-collapse:collapse;font-size:12px}
+        thead{background:var(--surface2)}
+        th{font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--t400);padding:7px 11px;text-align:left;border-bottom:1px solid var(--border)}
+        td{padding:7px 11px;border-bottom:1px solid var(--border);color:var(--t700);vertical-align:middle}
+        tr:last-child td{border-bottom:none}
+        tbody tr:hover td{background:var(--bg)}
+        .empty-row td{text-align:center;color:var(--t300);font-size:12px;padding:20px}
+        .id-cell{font-family:var(--mono);font-size:10px;color:var(--t400);background:var(--bg2);padding:2px 6px;border-radius:4px;display:inline-block}
+        .coord-cell{font-family:var(--mono);font-size:11px;color:var(--t500)}
+
+        /* ── Toast ── */
+        #toasts{position:fixed;bottom:16px;right:16px;display:flex;flex-direction:column;gap:6px;z-index:9999}
+        .toast{display:flex;align-items:flex-start;gap:8px;padding:9px 12px;border-radius:var(--r-lg);font-size:11.5px;font-weight:500;max-width:280px;box-shadow:var(--sh-lg);animation:tin .18s ease;border:1px solid}
+        @keyframes tin{from{opacity:0;transform:translateX(12px)}to{opacity:1;transform:none}}
+        .t-ico{flex-shrink:0;margin-top:1px}
+        .t-title{font-weight:700;font-size:11px;margin-bottom:1px}
+        .t-msg{font-size:11px;opacity:.8}
+        .toast-success{background:#f0faf3;border-color:var(--g100);color:#155724}
+        .toast-error{background:var(--red-lt);border-color:#fecaca;color:#7f1d1d}
+        .toast-info{background:var(--blue-lt);border-color:#bfdbfe;color:#1e3a5f}
+        .toast-warn{background:var(--amber-lt);border-color:#fde68a;color:#78350f}
+
+        /* ── Loader ── */
+        .spinner{display:inline-block;width:13px;height:13px;border:2px solid var(--border2);border-top-color:var(--g400);border-radius:50%;animation:spin .6s linear infinite;flex-shrink:0}
+        @keyframes spin{to{transform:rotate(360deg)}}
+        .loading-row{display:none;align-items:center;gap:8px;padding:14px;color:var(--t400);font-size:12px;justify-content:center}
+        .loading-row.show{display:flex}
+
+        /* ── MAP: fixed height based on available space ── */
+        .map-outer{background:var(--white);border:1.5px solid var(--border);border-radius:var(--r-xl);overflow:hidden;box-shadow:var(--sh);display:flex;flex-direction:column;flex:1;min-height:0}
+        .map-bar{display:flex;align-items:center;gap:6px;padding:7px 12px;border-bottom:1px solid var(--border);background:var(--surface2);flex-shrink:0}
+        .map-bar-title{font-size:11.5px;font-weight:700;color:var(--t700);display:flex;align-items:center;gap:5px}
+        .map-coord-pill{margin-left:auto;font-family:var(--mono);font-size:10px;color:var(--t400);background:var(--bg2);border:1px solid var(--border);border-radius:5px;padding:2px 8px}
+        .map-vp{position:relative;flex:1;min-height:0;background:#f6faf3;cursor:default;overflow:hidden}
+        .map-vp svg{position:absolute;inset:0;width:100%;height:100%}
+        .map-foot{padding:7px 12px;border-top:1px solid var(--border);background:var(--surface2);display:flex;align-items:center;gap:14px;flex-wrap:wrap;flex-shrink:0}
+        .leg-row{display:flex;align-items:center;gap:5px;font-size:10.5px;color:var(--t500);font-weight:500}
+        .leg-pip{width:9px;height:9px;border-radius:50%;flex-shrink:0}
+        .map-hint{font-size:10px;color:var(--t300);margin-left:auto;font-style:italic}
+
+        /* ── Bucket ── */
+        .bkt-layout{display:grid;grid-template-columns:1fr 1fr;gap:10px;flex:1;min-height:0}
+        .bkt-col{display:flex;flex-direction:column;min-height:0}
+        .bkt-col .card{flex:1;min-height:0;display:flex;flex-direction:column;margin-bottom:0}
+        .chips-scroll{flex:1;overflow-y:auto;min-height:0}
+        .chips-grid{display:grid;grid-template-columns:1fr 1fr;gap:5px;padding:2px 0}
+        .chip{display:flex;align-items:center;justify-content:space-between;padding:6px 9px;border-radius:var(--r);border:1.5px solid var(--border);background:var(--white);font-size:12px;font-weight:500;color:var(--t700);cursor:pointer;transition:all .12s;user-select:none}
+        .chip:hover{border-color:var(--g200);background:var(--g50);color:var(--g500)}
+        .chip.selected{border-color:var(--g400);background:var(--g50);color:var(--g500)}
+        .bkt-empty{color:var(--t300);font-size:12px;text-align:center;padding:20px 12px}
+        .bkt-counter{display:flex;align-items:center;justify-content:space-between;padding:8px 0 0;border-top:1px solid var(--border);margin-top:8px;font-size:11px;color:var(--t400);font-weight:600;flex-shrink:0}
+
+        /* ── Rec results ── */
+        .rec-card{background:linear-gradient(135deg,var(--g50),#f8fef8);border:1.5px solid var(--g200);border-radius:var(--r-xl);padding:14px;margin-top:10px;box-shadow:0 3px 12px rgba(45,166,83,.07)}
+        .rec-eyebrow{font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--g400);margin-bottom:5px;display:flex;align-items:center;gap:5px}
+        .rec-name{font-size:20px;font-weight:800;letter-spacing:-.02em;color:var(--t900);margin-bottom:6px}
+        .rec-meta{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:8px}
+        .rec-meta-item{display:flex;align-items:center;gap:5px;font-size:12px;color:var(--t500);font-weight:500}
+        .rec-tags{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px}
+        .adv-results{display:flex;flex-direction:column;gap:7px;margin-top:10px}
+        .adv-card{background:var(--white);border:1.5px solid var(--border);border-radius:var(--r-lg);padding:10px 13px;display:flex;align-items:center;gap:10px;transition:box-shadow .12s}
+        .adv-card:hover{box-shadow:var(--sh)}
+        .adv-card.rank-1{border-color:var(--g200);background:var(--g50)}
+        .adv-rnk{width:28px;height:28px;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;background:var(--bg2)}
+        .rank-1 .adv-rnk{background:var(--g100)}
+        .adv-info{flex:1;min-width:0}
+        .adv-name{font-size:13px;font-weight:700;margin-bottom:1px}
+        .adv-det{font-size:11px;color:var(--t400);font-family:var(--mono)}
+        .adv-tags{display:flex;flex-wrap:wrap;gap:4px;margin-top:5px}
+        .tag{display:inline-flex;align-items:center;gap:3px;padding:2px 7px;border-radius:99px;font-size:10.5px;font-weight:600}
+        .tag-green{background:var(--g100);color:var(--g500)}
+        .tag-orange{background:var(--orange-lt);color:var(--orange)}
+        .tag-gray{background:var(--bg2);color:var(--t400)}
+        .err-card{background:var(--red-lt);border:1.5px solid #fecaca;border-radius:var(--r-lg);padding:11px 14px;margin-top:10px;display:flex;align-items:flex-start;gap:8px;color:#991b1b;font-size:12px;font-weight:500}
+        hr{border:none;border-top:1px solid var(--border);margin:10px 0}
+
+        /* ── Visit path ── */
+        .path-steps{display:flex;flex-direction:column}
+        .path-step{display:flex;align-items:flex-start;gap:9px;padding:7px 0}
+        .path-step:not(:last-child){border-bottom:1px solid var(--border)}
+        .step-line{display:flex;flex-direction:column;align-items:center}
+        .step-node{width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+        .step-connector{width:2px;flex:1;min-height:12px;background:var(--border2);margin:2px 0}
+        .step-content{flex:1;padding-top:3px}
+        .step-label{font-size:12px;font-weight:700;color:var(--t900)}
+        .step-detail{font-size:11px;color:var(--t400);font-family:var(--mono);margin-top:1px}
+        .step-dist{font-size:10px;color:var(--t300);margin-top:2px}
+
+        @media(max-width:900px){
+          :root{--sidebar:180px}
+        }
+        @media(max-width:768px){
+          html,body{height:auto;overflow:auto}
+          .shell{grid-template-columns:1fr;grid-template-areas:"hd""mn";height:auto;overflow:visible}
+          main{height:auto;overflow:visible;padding:12px}
+          aside{display:none}
+          .panel.active{height:auto;display:block}
+          .panel-scroll{overflow:visible;height:auto}
+          .map-outer{height:300px}
+          .map-vp{height:100%}
+          .bkt-layout{grid-template-columns:1fr}
+          .fg2,.fg3{grid-template-columns:1fr}
+        }
+    </style>
+</head>
+<body>
+<div class="shell">
+
+    <!-- ══ HEADER ══ -->
+    <header>
+        <div class="hdr-logo">
+            <!-- Cart SVG icon -->
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/>
+                <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/>
+            </svg>
+        </div>
+        <div class="hdr-text">
+            <div class="hdr-title">Smart Grocery Finder</div>
+            <div class="hdr-sub">Coordinate-based shop recommender</div>
+        </div>
+        <div class="hdr-right">
+            <div class="api-pill">
+                <span class="live-dot"></span>
+                localhost:8080
+            </div>
+        </div>
+    </header>
+
+    <!-- ══ SIDEBAR ══ -->
+    <aside>
+        <div class="nav-lbl">Explore</div>
+        <button class="nav-btn active" onclick="nav('map')" data-panel="map">
+    <span class="nav-ico">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"/>
+        <line x1="9" y1="3" x2="9" y2="18"/><line x1="15" y1="6" x2="15" y2="21"/>
+      </svg>
+    </span>
+            Map View
+        </button>
+        <button class="nav-btn" onclick="nav('items')" data-panel="items">
+    <span class="nav-ico">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+        <polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/>
+      </svg>
+    </span>
+            Items
+            <span class="nav-badge" id="badge-items"></span>
+        </button>
+        <button class="nav-btn" onclick="nav('shops')" data-panel="shops">
+    <span class="nav-ico">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+        <polyline points="9 22 9 12 15 12 15 22"/>
+      </svg>
+    </span>
+            Shops
+            <span class="nav-badge" id="badge-shops"></span>
+        </button>
+
+        <div class="nav-lbl" style="margin-top:6px">Shopping</div>
+        <button class="nav-btn" onclick="nav('bucket')" data-panel="bucket">
+    <span class="nav-ico">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/>
+        <line x1="3" y1="6" x2="21" y2="6"/>
+        <path d="M16 10a4 4 0 0 1-8 0"/>
+      </svg>
+    </span>
+            Bucket List
+            <span class="nav-badge" id="badge-bucket"></span>
+        </button>
+        <button class="nav-btn" onclick="nav('recommend')" data-panel="recommend">
+    <span class="nav-ico">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+      </svg>
+    </span>
+            Recommend
+        </button>
+
+        <div class="sb-footer">v1.0 · Spring Boot API</div>
+    </aside>
+
+    <!-- ══ MAIN ══ -->
+    <main>
+
+        <!-- ── MAP ── -->
+        <div class="panel active" id="panel-map">
+            <div class="pg-hdr">
+                <div class="pg-hdr-row">
+                    <div>
+                        <div class="pg-title">Map View</div>
+                        <div class="pg-sub">View-only · set your location from the Recommend tab</div>
+                    </div>
+                    <button class="btn btn-outline btn-sm" onclick="loadShopsOnMap()">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+                        Refresh
+                    </button>
+                </div>
+            </div>
+            <div class="map-outer">
+                <div class="map-bar">
+                    <div class="map-bar-title">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--g400)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18M15 3v18"/></svg>
+                        Coordinate Grid Map
+                    </div>
+                    <button class="btn btn-ghost btn-sm" onclick="loadShopsOnMap()">
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+                    </button>
+                    <div class="map-coord-pill" id="hover-coords">Hover over map</div>
+                </div>
+                <div class="map-vp" id="map-vp">
+                    <svg id="map-svg" viewBox="0 0 620 480" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">
+                        <defs>
+                            <filter id="shadow-filter" x="-30%" y="-30%" width="160%" height="160%">
+                                <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="rgba(0,0,0,0.15)"/>
+                            </filter>
+                            <marker id="arrow-green" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#2da653"/></marker>
+                            <marker id="arrow-orange" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#f97316"/></marker>
+                            <marker id="arrow-blue" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#3b82f6"/></marker>
+                        </defs>
+                        <g id="m-bg"></g><g id="m-minor"></g><g id="m-major"></g>
+                        <g id="m-path"></g><g id="m-shops"></g><g id="m-user"></g>
+                    </svg>
+                </div>
+                <div class="map-foot">
+                    <div class="leg-row"><div class="leg-pip" style="background:#3b82f6;box-shadow:0 0 0 2px rgba(59,130,246,.2)"></div>You</div>
+                    <div class="leg-row"><div class="leg-pip" style="background:#2da653;box-shadow:0 0 0 2px rgba(45,166,83,.2)"></div>Shop</div>
+                    <div class="leg-row"><div class="leg-pip" style="background:#f97316;box-shadow:0 0 0 2px rgba(249,115,22,.2)"></div>Recommended</div>
+                    <div class="leg-row">
+                        <svg width="22" height="7" viewBox="0 0 22 7"><line x1="0" y1="3.5" x2="16" y2="3.5" stroke="#f97316" stroke-width="1.8" stroke-dasharray="4,2"/><polygon points="16,1 22,3.5 16,6" fill="#f97316"/></svg>
+                        Route path
+                    </div>
+                    <div class="map-hint">Hover to see coords · set location in Recommend</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── ITEMS ── -->
+        <div class="panel" id="panel-items">
+            <div class="pg-hdr">
+                <div class="pg-hdr-row">
+                    <div>
+                        <div class="pg-title">Items</div>
+                        <div class="pg-sub"><span class="rc">POST /items</span><span class="rc">GET /items</span><span class="rc">DELETE /items/{id}</span></div>
+                    </div>
+                </div>
+            </div>
+            <div class="panel-scroll">
+                <div class="card">
+                    <div class="card-hdr">
+                        <div class="card-title"><div class="card-ico"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--g400)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg></div>Add New Item</div>
+                    </div>
+                    <div class="fg fga" style="max-width:420px">
+                        <div class="field"><label>Item Name</label>
+                            <input type="text" id="item-name" placeholder="e.g. Milk, Bread, Eggs…" onkeydown="if(event.key==='Enter')createItem()"/></div>
+                        <div class="field"><label>&nbsp;</label>
+                            <button class="btn btn-primary" onclick="createItem()">
+                                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                                Add
+                            </button></div>
+                    </div>
+                </div>
+                <div class="card" style="flex:1;min-height:0;display:flex;flex-direction:column">
+                    <div class="card-hdr">
+                        <div class="card-title"><div class="card-ico"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--g400)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg></div>All Items</div>
+                        <button class="btn btn-ghost btn-sm" onclick="loadItems()">
+                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+                            Refresh
+                        </button>
+                    </div>
+                    <div id="items-loading" class="loading-row"><div class="spinner"></div> Loading…</div>
+                    <div class="tbl-wrap" style="flex:1;overflow-y:auto">
+                        <table><thead><tr><th>ID</th><th>Name</th><th>In Bucket</th><th>Action</th></tr></thead>
+                            <tbody id="items-tbody"><tr class="empty-row"><td colspan="4">No items yet.</td></tr></tbody></table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── SHOPS ── -->
+        <div class="panel" id="panel-shops">
+            <div class="pg-hdr">
+                <div class="pg-hdr-row">
+                    <div>
+                        <div class="pg-title">Shops</div>
+                        <div class="pg-sub"><span class="rc">POST /shops</span><span class="rc">GET /shops</span><span class="rc">POST /shops/{id}/items/{id}</span></div>
+                    </div>
+                </div>
+            </div>
+            <div class="panel-scroll">
+                <div class="card">
+                    <div class="card-hdr">
+                        <div class="card-title"><div class="card-ico"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--g400)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg></div>Add New Shop</div>
+                    </div>
+                    <div class="fg fg3" style="max-width:520px">
+                        <div class="field"><label>Shop Name</label><input type="text" id="shop-name" placeholder="e.g. ShopA"/></div>
+                        <div class="field"><label>X Coordinate</label><input type="number" id="shop-x" placeholder="e.g. 3.0" step="0.5"/></div>
+                        <div class="field"><label>Y Coordinate</label><input type="number" id="shop-y" placeholder="e.g. 3.0" step="0.5"/></div>
+                    </div>
+                    <div class="btn-row">
+                        <button class="btn btn-primary" onclick="createShop()">
+                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                            Add Shop
+                        </button>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-hdr">
+                        <div class="card-title"><div class="card-ico"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--g400)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg></div>Assign Item to Shop</div>
+                        <button class="btn btn-ghost btn-sm" onclick="refreshAssignDropdowns()">
+                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+                            Refresh
+                        </button>
+                    </div>
+                    <div class="fg fg2" style="max-width:460px">
+                        <div class="field"><label>Shop</label>
+                            <select id="assign-shop-sel"><option value="">— select shop —</option></select></div>
+                        <div class="field"><label>Item</label>
+                            <select id="assign-item-sel"><option value="">— select item —</option></select></div>
+                    </div>
+                    <div class="btn-row">
+                        <button class="btn btn-outline" onclick="assignItem()">
+                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+                            Assign Item → Shop
+                        </button>
+                    </div>
+                </div>
+                <div class="card" style="flex:1;min-height:0;display:flex;flex-direction:column">
+                    <div class="card-hdr">
+                        <div class="card-title"><div class="card-ico"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--g400)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg></div>All Shops</div>
+                        <button class="btn btn-ghost btn-sm" onclick="loadShops()">
+                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+                            Refresh
+                        </button>
+                    </div>
+                    <div id="shops-loading" class="loading-row"><div class="spinner"></div> Loading…</div>
+                    <div class="tbl-wrap" style="flex:1;overflow-y:auto">
+                        <table><thead><tr><th>ID</th><th>Name</th><th>X</th><th>Y</th><th>Action</th></tr></thead>
+                            <tbody id="shops-tbody"><tr class="empty-row"><td colspan="5">No shops yet.</td></tr></tbody></table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── BUCKET ── -->
+        <div class="panel" id="panel-bucket">
+            <div class="pg-hdr">
+                <div class="pg-hdr-row">
+                    <div>
+                        <div class="pg-title">Bucket List</div>
+                        <div class="pg-sub">Pick items you want to buy — used for recommendations</div>
+                    </div>
+                    <button class="btn btn-outline btn-sm" onclick="loadItemsForBucket()">
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+                        Reload
+                    </button>
+                </div>
+            </div>
+            <div class="bkt-layout">
+                <div class="bkt-col">
+                    <div class="card">
+                        <div class="card-hdr">
+                            <div class="card-title"><div class="card-ico"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--g400)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg></div>Available Items</div>
+                        </div>
+                        <div id="bucket-loading" class="loading-row"><div class="spinner"></div></div>
+                        <div class="chips-scroll">
+                            <div id="items-chips"><div class="bkt-empty">Click "Reload" to load items</div></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="bkt-col">
+                    <div class="card">
+                        <div class="card-hdr">
+                            <div class="card-title"><div class="card-ico"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--g400)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg></div>Your Bucket</div>
+                            <button class="btn btn-danger btn-sm" onclick="clearBucket()">
+                                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+                                Clear
+                            </button>
+                        </div>
+                        <div class="chips-scroll">
+                            <div id="bucket-selected"><div class="bkt-empty">No items selected yet</div></div>
+                        </div>
+                        <div class="bkt-counter">
+                            <span><strong id="bucket-count">0</strong> selected</span>
+                            <button class="btn btn-primary btn-sm" onclick="nav('recommend')">
+                                Find Shop <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── RECOMMEND ── -->
+        <div class="panel" id="panel-recommend">
+            <div class="pg-hdr">
+                <div class="pg-hdr-row">
+                    <div>
+                        <div class="pg-title">Recommendations</div>
+                        <div class="pg-sub"><span class="rc">POST /recommend</span><span class="rc">POST /recommend/advanced</span></div>
+                    </div>
+                </div>
+            </div>
+            <div class="panel-scroll">
+                <div class="card">
+                    <div class="card-hdr">
+                        <div class="card-title"><div class="card-ico"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--g400)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg></div>Your Starting Location</div>
+                    </div>
+                    <div class="fg fg2" style="max-width:340px">
+                        <div class="field"><label>User X</label><input type="number" id="rec-x" placeholder="e.g. 0" step="0.5" oninput="renderMap()"/></div>
+                        <div class="field"><label>User Y</label><input type="number" id="rec-y" placeholder="e.g. 0" step="0.5" oninput="renderMap()"/></div>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-hdr">
+                        <div class="card-title"><div class="card-ico"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--g400)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg></div>Items to Find</div>
+                        <button class="btn btn-ghost btn-sm" onclick="nav('bucket')">Edit Bucket</button>
+                    </div>
+                    <div id="rec-bucket-preview" style="font-size:12px;color:var(--t300)">Go to Bucket List and select items first.</div>
+                    <hr/>
+                    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+                        <button class="btn btn-primary" onclick="runBasicRecommend()">
+                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                            Find Best Shop
+                        </button>
+                        <button class="btn btn-orange" onclick="runAdvancedRecommend()">
+                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2"/><path d="M16.24 7.76a6 6 0 0 1 0 8.49m-8.48-.01a6 6 0 0 1 0-8.49m11.31-2.82a10 10 0 0 1 0 14.14m-14.14 0a10 10 0 0 1 0-14.14"/></svg>
+                            Advanced Multi-Shop
+                        </button>
+                    </div>
+                    <div id="rec-loading" class="loading-row"><div class="spinner"></div> Analysing…</div>
+                </div>
+                <div id="rec-output"></div>
+            </div>
+        </div>
+
+    </main>
+</div>
+<div id="toasts"></div>
+
+<script>
+    /* ═══════════════════════ CONFIG ═══════════════════════ */
+    const BASE = 'http://localhost:8080';
+
+    /* ═══════════════════════ STATE ═══════════════════════ */
+    let allItems  = [];
+    let allShops  = [];
+    let bucket    = [];       // string[] — item names
+    let hlShopId  = null;     // highlighted/selected shop id
+    let visitPath = [];       // ordered array of {id,name,x,y} for the path to draw
+
+    /* ═══════════════════════ NAV ═══════════════════════ */
+    function nav(name) {
+      document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+      document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+      document.getElementById('panel-' + name).classList.add('active');
+      document.querySelector(`[data-panel="${name}"]`).classList.add('active');
+      if (name === 'map') {
+        // If we already have shops loaded, just re-render (preserves visitPath)
+        // Otherwise fetch shops first
+        if (allShops.length > 0) { renderMap(); }
+        else { loadShopsOnMap(); }
+      }
+      if (name === 'items')     loadItems();
+      if (name === 'shops')     { loadShops(); }
+      if (name === 'bucket')    loadItemsForBucket();
+      if (name === 'recommend') refreshRecPreview();
+    }
+
+    /* Switch to map tab without wiping state — used by "View on Map" buttons */
+    function goToMap(){
+      document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+      document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+      document.getElementById('panel-map').classList.add('active');
+      document.querySelector('[data-panel="map"]').classList.add('active');
+      // Just re-render — visitPath and allShops are already set
+      renderMap();
+    }
+
+    /* ═══════════════════════ TOAST ═══════════════════════ */
+    const TM = {
+      success:{ svg:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>', title:'Success' },
+      error:  { svg:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>', title:'Error' },
+      info:   { svg:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>', title:'Info' },
+      warn:   { svg:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>', title:'Warning' },
+    };
+    function toast(msg, type='info', ms=4000) {
+      const m = TM[type]||TM.info;
+      const el = document.createElement('div');
+      el.className = `toast toast-${type}`;
+      el.innerHTML = `<div class="t-ico">${m.svg}</div><div><div class="t-title">${m.title}</div><div class="t-msg">${msg}</div></div>`;
+      document.getElementById('toasts').appendChild(el);
+      setTimeout(() => { el.style.transition='opacity .3s,transform .3s'; el.style.opacity='0'; el.style.transform='translateX(8px)'; setTimeout(()=>el.remove(),320); }, ms);
+    }
+
+    /* ═══════════════════════ API ═══════════════════════ */
+    async function api(path, opts={}) {
+      const res = await fetch(BASE+path, { headers:{'Content-Type':'application/json'}, ...opts });
+      if (res.status===204) return null;
+      let data; try { data=await res.json(); } catch { data=null; }
+      if (!res.ok) throw new Error(data?.message||data?.error||`HTTP ${res.status}`);
+      return data;
+    }
+
+    /* ═══════════════════════ BADGES ═══════════════════════ */
+    function setBadge(id, n) {
+      const el = document.getElementById('badge-'+id);
+      if (!el) return;
+      if (n>0){el.textContent=n;el.classList.add('show');}else el.classList.remove('show');
+    }
+
+    /* ═══════════════════════ ITEMS ═══════════════════════ */
+    async function loadItems() {
+      const ld = document.getElementById('items-loading');
+      ld.classList.add('show');
+      try { allItems=await api('/items')||[]; renderItemsTable(); setBadge('items',allItems.length); refreshAssignDropdowns(); }
+      catch(e){ toast('Could not load items: '+e.message,'error'); }
+      finally { ld.classList.remove('show'); }
+    }
+    function renderItemsTable() {
+      const tb = document.getElementById('items-tbody');
+      if (!allItems.length){ tb.innerHTML='<tr class="empty-row"><td colspan="4">No items yet.</td></tr>'; return; }
+      tb.innerHTML = allItems.map(it=>`
+        <tr>
+          <td><span class="id-cell">${it.id}</span></td>
+          <td style="font-weight:600">${it.name}</td>
+          <td>${bucket.includes(it.name)?'<span class="tag tag-green">In bucket</span>':'<span class="tag tag-gray">—</span>'}</td>
+          <td><button class="btn btn-danger btn-sm" onclick="deleteItem(${it.id},'${it.name}')">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+            Delete
+          </button></td>
+        </tr>`).join('');
+    }
+    async function createItem() {
+      const inp=document.getElementById('item-name'), name=inp.value.trim();
+      if (!name){ toast('Item name is required','warn'); inp.focus(); return; }
+      try { await api('/items',{method:'POST',body:JSON.stringify({name})}); toast(`"${name}" added`,'success'); inp.value=''; inp.focus(); await loadItems(); }
+      catch(e){ toast('Failed: '+e.message,'error'); }
+    }
+    async function deleteItem(id,name) {
+      if (!confirm(`Delete "${name}"?`)) return;
+      try { await api(`/items/${id}`,{method:'DELETE'}); toast(`"${name}" deleted`,'success'); bucket=bucket.filter(b=>b!==name); updateBucketBadge(); await loadItems(); }
+      catch(e){ toast('Delete failed: '+e.message,'error'); }
+    }
+
+    /* ═══════════════════════ SHOPS ═══════════════════════ */
+    async function loadShops() {
+      const ld=document.getElementById('shops-loading'); ld.classList.add('show');
+      try { allShops=await api('/shops')||[]; renderShopsTable(); setBadge('shops',allShops.length); refreshAssignDropdowns(); }
+      catch(e){ toast('Could not load shops: '+e.message,'error'); }
+      finally { ld.classList.remove('show'); }
+    }
+    function renderShopsTable() {
+      const tb=document.getElementById('shops-tbody');
+      if (!allShops.length){ tb.innerHTML='<tr class="empty-row"><td colspan="5">No shops yet.</td></tr>'; return; }
+      tb.innerHTML=allShops.map(s=>`
+        <tr>
+          <td><span class="id-cell">${s.id}</span></td>
+          <td style="font-weight:600">${s.name}</td>
+          <td><span class="coord-cell">${s.xcoordinate}</span></td>
+          <td><span class="coord-cell">${s.ycoordinate}</span></td>
+          <td><button class="btn btn-outline btn-sm" onclick="pinShop(${s.id})">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"/><line x1="9" y1="3" x2="9" y2="18"/><line x1="15" y1="6" x2="15" y2="21"/></svg>
+            Map
+          </button></td>
+        </tr>`).join('');
+    }
+    async function createShop() {
+      const name=document.getElementById('shop-name').value.trim();
+      const x=parseFloat(document.getElementById('shop-x').value);
+      const y=parseFloat(document.getElementById('shop-y').value);
+      if (!name){ toast('Shop name is required','warn'); return; }
+      if (isNaN(x)||isNaN(y)){ toast('X and Y coordinates required','warn'); return; }
+      try {
+        await api('/shops',{method:'POST',body:JSON.stringify({name,xcoordinate:x,ycoordinate:y})});
+        toast(`Shop "${name}" created at (${x},${y})`,'success');
+        ['shop-name','shop-x','shop-y'].forEach(id=>document.getElementById(id).value='');
+        await loadShops(); renderMap();
+      } catch(e){ toast('Failed: '+e.message,'error'); }
+    }
+    async function assignItem() {
+      const shopSel = document.getElementById('assign-shop-sel');
+      const itemSel = document.getElementById('assign-item-sel');
+      const shopId  = shopSel?.value;
+      const itemId  = itemSel?.value;
+      const shopName = shopSel?.options[shopSel.selectedIndex]?.text || '';
+      const itemName = itemSel?.options[itemSel.selectedIndex]?.text || '';
+      if (!shopId || !itemId){ toast('Select both a shop and an item','warn'); return; }
+      try {
+        await api(`/shops/${shopId}/items/${itemId}`,{method:'POST'});
+        toast(`"${itemName}" assigned to "${shopName}"`, 'success');
+        shopSel.value = '';
+        itemSel.value = '';
+      } catch(e){ toast('Assignment failed: '+e.message,'error'); }
+    }
+
+    function refreshAssignDropdowns(){
+      const shopSel = document.getElementById('assign-shop-sel');
+      const itemSel = document.getElementById('assign-item-sel');
+      if(!shopSel || !itemSel) return;
+      const prevShop = shopSel.value, prevItem = itemSel.value;
+      shopSel.innerHTML = '<option value="">— select shop —</option>' +
+        allShops.map(s=>`<option value="${s.id}">${s.name}</option>`).join('');
+      itemSel.innerHTML = '<option value="">— select item —</option>' +
+        allItems.map(i=>`<option value="${i.id}">${i.name}</option>`).join('');
+      // Restore previous selection if still valid
+      if(prevShop) shopSel.value = prevShop;
+      if(prevItem) itemSel.value = prevItem;
+    }
+    function pinShop(id) { hlShopId=id; nav('map'); setTimeout(renderMap,80); }
+
+    /* ═══════════════════════ BUCKET ═══════════════════════ */
+    async function loadItemsForBucket() {
+      const ld=document.getElementById('bucket-loading'); ld.classList.add('show');
+      try { allItems=await api('/items')||[]; renderChips(); }
+      catch(e){ toast('Could not load: '+e.message,'error'); }
+      finally { ld.classList.remove('show'); }
+    }
+    function renderChips() {
+      const c=document.getElementById('items-chips');
+      if (!allItems.length){ c.innerHTML='<div class="bkt-empty">No items in system yet.</div>'; return; }
+      c.innerHTML=`<div class="chips-grid">${allItems.map(it=>`
+        <div class="chip ${bucket.includes(it.name)?'selected':''}" onclick="toggleBucket('${it.name}')">
+          <span>${it.name}</span>
+          <span>${bucket.includes(it.name)
+            ? '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>'
+            : '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>'
+          }</span>
+        </div>`).join('')}</div>`;
+      renderBucketSelected();
+    }
+    function toggleBucket(name){ bucket.includes(name)?bucket=bucket.filter(b=>b!==name):bucket.push(name); renderChips(); updateBucketBadge(); }
+    function renderBucketSelected(){
+      const el=document.getElementById('bucket-selected');
+      document.getElementById('bucket-count').textContent=bucket.length;
+      if (!bucket.length){ el.innerHTML='<div class="bkt-empty">No items selected yet</div>'; return; }
+      el.innerHTML=`<div class="chips-grid">${bucket.map(n=>`
+        <div class="chip selected" onclick="toggleBucket('${n}')">
+          <span>${n}</span>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+        </div>`).join('')}</div>`;
+    }
+    function clearBucket(){ bucket=[]; renderChips(); updateBucketBadge(); }
+    function updateBucketBadge(){ setBadge('bucket',bucket.length); document.getElementById('bucket-count').textContent=bucket.length; }
+
+    /* ═══════════════════════ RECOMMEND ═══════════════════════ */
+    function refreshRecPreview(){
+      const el=document.getElementById('rec-bucket-preview');
+      if (!bucket.length){ el.innerHTML='<span style="color:var(--t300)">Go to the Bucket List tab and select items first.</span>'; return; }
+      el.innerHTML=bucket.map(n=>`<span class="tag tag-green" style="margin:2px">${n}</span>`).join('');
+    }
+    function pick(obj,...keys){ for(const k of keys)if(obj!=null&&obj[k]!=null)return obj[k]; return null; }
+
+    /* ── Single source of truth: rec-x / rec-y ──
+       Returns null when either field is blank — user hasn't set a position yet. */
+    function getCoords(){
+      const xv = document.getElementById('rec-x')?.value.trim();
+      const yv = document.getElementById('rec-y')?.value.trim();
+      if(!xv || !yv) return null;
+      const x = parseFloat(xv), y = parseFloat(yv);
+      if(isNaN(x) || isNaN(y)) return null;
+      return { userX: x, userY: y };
+    }
+
+    function hasUserPosition(){ return getCoords() !== null; }
+
+    function syncCoords(){} // no-op — kept so old call sites don't break
+
+    function setAllCoords(x, y){
+      const rx = document.getElementById('rec-x'); if(rx) rx.value = x;
+      const ry = document.getElementById('rec-y'); if(ry) ry.value = y;
+      renderMap();
+    }
+
+    async function runBasicRecommend(){
+      if(!bucket.length){ toast('Select items in the Bucket List first','warn'); return; }
+      if(!hasUserPosition()){
+        showRecError('Please enter your X and Y coordinates before finding a shop.');
+        return;
+      }
+      const {userX,userY} = getCoords();
+      const ld = document.getElementById('rec-loading'); ld.classList.add('show');
+      document.getElementById('rec-output').innerHTML = '';
+      try {
+        /* Ensure shops loaded for name→coord lookup */
+        if(!allShops.length){ allShops = await api('/shops') || []; }
+
+        const r = await api('/recommend', {method:'POST', body:JSON.stringify({userX,userY,items:bucket})});
+        if(!r){ showRecError('No result returned from API'); return; }
+
+        /* Resolve shop coords by name-match against allShops (most reliable) */
+        const shopName = pick(r,'shopName','name') || '';
+        const shopId   = pick(r,'shopId','id');
+        const matched  =
+          allShops.find(s => s.name.toLowerCase() === shopName.toLowerCase()) ||
+          allShops.find(s => s.id === shopId);
+
+        const rx = matched ? matched.xcoordinate : (pick(r,'shopX','xCoordinate','xcoordinate') ?? null);
+        const ry = matched ? matched.ycoordinate : (pick(r,'shopY','yCoordinate','ycoordinate') ?? null);
+
+        if(rx === null || ry === null){
+          toast('Shop coordinates not found — check shop is saved in /shops', 'warn');
+        }
+
+        /* Build visitPath BEFORE rendering so display uses real coords */
+        visitPath = [{
+          id:          matched?.id ?? shopId,
+          name:        matched?.name || shopName || 'Shop',
+          xcoordinate: rx !== null ? Number(rx) : 0,
+          ycoordinate: ry !== null ? Number(ry) : 0,
+          distance:    r.distance,
+          items:       r.itemsFound || r.items || []
+        }];
+        hlShopId = visitPath[0].id;
+
+        renderBasicResult(visitPath[0], userX, userY, r);
+        renderMap();
+        toast('Best shop found! See map for route.', 'success');
+      } catch(e){ toast('Recommendation failed: '+e.message,'error'); showRecError(e.message); }
+      finally { ld.classList.remove('show'); }
+    }
+
+    async function runAdvancedRecommend(){
+      if(!bucket.length){ toast('Select items in the Bucket List first','warn'); return; }
+      if(!hasUserPosition()){
+        showRecError('Please enter your X and Y coordinates before finding a shop.');
+        return;
+      }
+      const {userX,userY} = getCoords();
+      const ld = document.getElementById('rec-loading'); ld.classList.add('show');
+      document.getElementById('rec-output').innerHTML = '';
+      try {
+        if(!allShops.length){ allShops = await api('/shops') || []; }
+
+        const results = await api('/recommend/advanced', {method:'POST', body:JSON.stringify({userX,userY,items:bucket})});
+        if(!results?.length){ showRecError('No results returned from API'); return; }
+
+        /* Resolve each shop's coords by name-match FIRST, then build visitPath */
+        visitPath = results.map(r => {
+          const shopName = pick(r,'shopName','name') || '';
+          const shopId   = pick(r,'shopId','id');
+          const matched  =
+            allShops.find(s => s.name.toLowerCase() === shopName.toLowerCase()) ||
+            allShops.find(s => s.id === shopId);
+          const rx = matched ? matched.xcoordinate : (pick(r,'shopX','xCoordinate','xcoordinate') ?? 0);
+          const ry = matched ? matched.ycoordinate : (pick(r,'shopY','yCoordinate','ycoordinate') ?? 0);
+          return {
+            id:          matched?.id ?? shopId,
+            name:        matched?.name || shopName || 'Shop',
+            xcoordinate: Number(rx),
+            ycoordinate: Number(ry),
+            distance:    r.distance,
+            items:       r.itemsFound || r.items || []
+          };
+        });
+        hlShopId = visitPath[0]?.id || null;
+
+        renderAdvancedResults(visitPath, userX, userY, results);
+        renderMap();
+        toast('Advanced route ready! See map for path.', 'success');
+      } catch(e){ toast('Failed: '+e.message,'error'); showRecError(e.message); }
+      finally { ld.classList.remove('show'); }
+    }
+
+    /* resolvedShop = visitPath[0], already has correct xcoordinate/ycoordinate
+       rawResponse  = original API response for items found/missing             */
+    function renderBasicResult(resolvedShop, userX, userY, rawResponse){
+      const r = rawResponse || {};
+      const shopName = resolvedShop.name || '—';
+      const cx       = resolvedShop.xcoordinate;
+      const cy       = resolvedShop.ycoordinate;
+      const coordStr = (cx !== 0 || cy !== 0) ? `(${cx}, ${cy})` : '(resolving…)';
+      const distVal  = resolvedShop.distance != null ? parseFloat(resolvedShop.distance).toFixed(3) : '—';
+      const found    = resolvedShop.items || r.itemsFound || r.items || [];
+      const missing  = r.itemsNotFound || r.missingItems || [];
+      const pathHtml = buildPathStepsHtml([resolvedShop], userX, userY);
+
+      document.getElementById('rec-output').innerHTML=`
+        <div class="rec-card">
+          <div class="rec-eyebrow">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+            Best Match Found
+          </div>
+          <div class="rec-name">${shopName}</div>
+          <div class="rec-meta">
+            <div class="rec-meta-item">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+              ${coordStr}
+            </div>
+            <div class="rec-meta-item">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2l10 10-10 10"/></svg>
+              Distance: ${distVal}
+            </div>
+          </div>
+          ${found.length?`<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--t400);margin-bottom:5px">Items Covered</div>
+          <div class="rec-tags">${found.map(i=>`<span class="tag tag-green"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>${i}</span>`).join('')}</div>`:''}
+          ${missing.length?`<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--t400);margin:10px 0 5px">Not Available</div>
+          <div class="rec-tags">${missing.map(i=>`<span class="tag tag-orange">${i}</span>`).join('')}</div>`:''}
+        </div>
+        <div class="card" style="margin-top:16px">
+          <div class="card-hdr"><div class="card-title">
+            <div class="card-ico"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--g400)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 0 0 1 1h3m10-11l2 2m-2-2v10a1 1 0 0 1-1 1h-3m-6 0a1 1 0 0 0 1-1v-4a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v4a1 1 0 0 0 1 1m-6 0h6"/></svg></div>
+            Visit Path
+          </div></div>
+          ${pathHtml}
+        </div>
+        <div class="btn-row">
+          <button class="btn btn-outline" onclick="goToMap()">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"/><line x1="9" y1="3" x2="9" y2="18"/><line x1="15" y1="6" x2="15" y2="21"/></svg>
+            View on Map
+          </button>
+        </div>`;
+    }
+
+    /* resolvedStops = visitPath array (already has correct coords)
+       rawResults    = original API response array                  */
+    function renderAdvancedResults(resolvedStops, userX, userY, rawResults){
+      if(!resolvedStops?.length){ showRecError('No results returned'); return; }
+
+      const cards = resolvedStops.map((shop, i) => {
+        const coordStr = `(${shop.xcoordinate}, ${shop.ycoordinate})`;
+        const distVal  = shop.distance != null ? parseFloat(shop.distance).toFixed(3) : '—';
+        const found    = shop.items || [];
+        const raw      = rawResults?.[i] || {};
+        const miss     = raw.itemsNotFound || raw.missingItems || [];
+        const rankEmoji = ['🥇','🥈','🥉'][i] || `#${i+1}`;
+        return `<div class="adv-card ${i===0?'rank-1':''}">
+          <div class="adv-rnk">${rankEmoji}</div>
+          <div class="adv-info">
+            <div class="adv-name">${shop.name}</div>
+            <div class="adv-det">${coordStr} · d=${distVal}</div>
+            <div class="adv-tags">
+              ${found.map(n=>`<span class="tag tag-green">${n}</span>`).join('')}
+              ${miss.map(n=>`<span class="tag tag-orange">${n}</span>`).join('')}
+            </div>
+          </div>
+        </div>`;
+      }).join('');
+
+      /* resolvedStops already has correct coords — use directly, no re-lookup needed */
+      document.getElementById('rec-output').innerHTML=`
+        <div style="font-size:12px;color:var(--t400);margin-bottom:10px;font-weight:600">${resolvedStops.length} route(s) — sorted by optimality</div>
+        <div class="adv-results">${cards}</div>
+        <div class="card" style="margin-top:16px">
+          <div class="card-hdr"><div class="card-title">
+            <div class="card-ico"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--g400)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 0 0 1 1h3m10-11l2 2m-2-2v10a1 1 0 0 1-1 1h-3m-6 0a1 1 0 0 0 1-1v-4a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v4a1 1 0 0 0 1 1m-6 0h6"/></svg></div>
+            Suggested Visit Path
+          </div></div>
+          ${buildPathStepsHtml(resolvedStops, userX, userY)}
+        </div>
+        <div class="btn-row">
+          <button class="btn btn-outline" onclick="goToMap()">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"/><line x1="9" y1="3" x2="9" y2="18"/><line x1="15" y1="6" x2="15" y2="21"/></svg>
+            View on Map
+          </button>
+        </div>`;
+    }
+
+    function buildPathStepsHtml(stops, userX, userY){
+      const all = [
+        {type:'start', name:'Your Location', x:userX, y:userY},
+        ...stops.map((s,i)=>({type:'shop', ...s, x:s.xcoordinate, y:s.ycoordinate, index:i}))
+      ];
+      return `<div class="path-steps">${all.map((step,i)=>{
+        const isLast = i===all.length-1;
+        const isStart = step.type==='start';
+        const nodeColor = isStart ? '#3b82f6' : (step.index===0?'#2da653':'#64748b');
+        const nodeBg = isStart ? '#eff6ff' : (step.index===0?'#f0faf3':'#f8fafc');
+        const nodeBorder = isStart ? '#bfdbfe' : (step.index===0?'var(--g200)':'#e2e8f0');
+        let distLabel='';
+        if (!isStart&&step.distance!=null) distLabel=`<div class="step-dist">Distance from previous: ${parseFloat(step.distance).toFixed(3)}</div>`;
+        const icon = isStart
+          ? `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="${nodeColor}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>`
+          : `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="${nodeColor}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>`;
+        return `<div class="path-step">
+          <div class="step-line">
+            <div class="step-node" style="background:${nodeBg};border:1.5px solid ${nodeBorder}">${icon}</div>
+            ${!isLast?`<div class="step-connector"></div>`:''}
+          </div>
+          <div class="step-content">
+            <div class="step-label">${isStart?'Start: ':step.index===0?'#1 · ':'#'+(step.index+1)+' · '}${step.name}</div>
+            <div class="step-detail">(${step.x}, ${step.y})</div>
+            ${distLabel}
+            ${step.items?.length?`<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:5px">${step.items.map(it=>`<span class="tag tag-green" style="font-size:11px">${it}</span>`).join('')}</div>`:''}
+          </div>
+        </div>`;
+      }).join('')}</div>`;
+    }
+
+    function showRecError(msg){
+      document.getElementById('rec-output').innerHTML=`
+        <div class="err-card">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          <div><strong>Error:</strong> ${msg}</div>
+        </div>`;
+    }
+
+    /* ═══════════════════════════════════════════════════
+       MAP — auto-scale to shop+user positions,
+             auto-compute nearest-neighbour path from
+             user → all shops (greedy), draw immediately.
+             visitPath from recommendation overrides this.
+    ═══════════════════════════════════════════════════ */
+    const SVG_W=620, SVG_H=480;
+    const MAP_PAD=52; // room for labels + pin labels
+
+    /* ── Euclidean distance ── */
+    function dist(ax,ay,bx,by){ return Math.sqrt((bx-ax)**2+(by-ay)**2); }
+
+    /* ── Greedy nearest-neighbour tour starting from user ──
+       Returns shops sorted by visit order.                  */
+    function nearestNeighbourPath(ux, uy, shops){
+      if (!shops.length) return [];
+      let remaining=[...shops];
+      const order=[];
+      let cx=ux, cy=uy;
+      while(remaining.length){
+        let best=null, bestD=Infinity;
+        remaining.forEach(s=>{
+          const d=dist(cx,cy,s.xcoordinate,s.ycoordinate);
+          if(d<bestD){bestD=d;best=s;}
+        });
+        order.push({...best, distFromPrev:bestD});
+        cx=best.xcoordinate; cy=best.ycoordinate;
+        remaining=remaining.filter(s=>s.id!==best.id);
+      }
+      return order;
+    }
+
+    /* ── Compute tight view bounds padded around all points ── */
+    function getBounds(ux,uy){
+      const pts=[{x:ux,y:uy},...allShops.map(s=>({x:s.xcoordinate,y:s.ycoordinate}))];
+      if(pts.length===1) return {minX:Math.max(0,ux-5),minY:Math.max(0,uy-5),maxX:ux+5,maxY:uy+5};
+      let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
+      pts.forEach(p=>{minX=Math.min(minX,p.x);minY=Math.min(minY,p.y);maxX=Math.max(maxX,p.x);maxY=Math.max(maxY,p.y);});
+      const rx=Math.max(maxX-minX,1), ry=Math.max(maxY-minY,1);
+      return { minX:minX-rx*.22, minY:minY-ry*.22, maxX:maxX+rx*.22, maxY:maxY+ry*.22 };
+    }
+
+    function toSVG(x,y,b){
+      const dw=SVG_W-MAP_PAD*2, dh=SVG_H-MAP_PAD*2;
+      const rx=b.maxX-b.minX||1, ry=b.maxY-b.minY||1;
+      return {
+        sx: MAP_PAD+(x-b.minX)/rx*dw,
+        sy: (SVG_H-MAP_PAD)-(y-b.minY)/ry*dh
+      };
+    }
+
+    /* ── Nice round step for grid lines ── */
+    function niceStep(range){
+      if(range<=0) return 1;
+      const rough=range/6;
+      const mag=Math.pow(10,Math.floor(Math.log10(rough)));
+      const n=rough/mag;
+      if(n<1.5) return mag;
+      if(n<3.5) return 2*mag;
+      if(n<7.5) return 5*mag;
+      return 10*mag;
+    }
+
+    async function loadShopsOnMap(){
+      try {
+        const freshShops = await api('/shops')||[];
+        allShops = freshShops;
+        // Re-resolve visitPath coords now that we have fresh shop data
+        if(visitPath.length>0){
+          visitPath = visitPath.map(vp=>{
+            const matched = allShops.find(s=>s.id===vp.id);
+            return matched ? {
+              ...vp,
+              xcoordinate: matched.xcoordinate,
+              ycoordinate: matched.ycoordinate
+            } : vp;
+          });
+        }
+      } catch(e){ toast('Map: could not load shops','warn'); }
+      renderMap();
+    }
+
+    /* Bounds when no user position — shops only */
+    function getBoundsShopsOnly(){
+      if(!allShops.length) return {minX:0,minY:0,maxX:10,maxY:10};
+      let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
+      allShops.forEach(s=>{
+        minX=Math.min(minX,s.xcoordinate); minY=Math.min(minY,s.ycoordinate);
+        maxX=Math.max(maxX,s.xcoordinate); maxY=Math.max(maxY,s.ycoordinate);
+      });
+      const rx=Math.max(maxX-minX,1), ry=Math.max(maxY-minY,1);
+      return {minX:minX-rx*.25, minY:minY-ry*.25, maxX:maxX+rx*.25, maxY:maxY+ry*.25};
+    }
+
+    function renderMap(){
+      /* Position is optional — only show user pin when coords are entered */
+      const coords = getCoords();
+      const hasPos = coords !== null;
+      const ux = hasPos ? coords.userX : null;
+      const uy = hasPos ? coords.userY : null;
+
+      /* Bounds: include user if position is set, else fit shops only */
+      const b = hasPos ? getBounds(ux, uy) : getBoundsShopsOnly();
+
+      /* Only draw a path when a recommendation has been run AND user position is set */
+      const drawPath = visitPath.length > 0 && hasPos;
+      const pathStops = drawPath ? visitPath : [];
+
+      /* ── 1. Background ── */
+      const dw = SVG_W - MAP_PAD*2, dh = SVG_H - MAP_PAD*2;
+      document.getElementById('m-bg').innerHTML =
+        `<rect width="${SVG_W}" height="${SVG_H}" fill="#f4f8f0"/>
+         <rect x="${MAP_PAD}" y="${MAP_PAD}" width="${dw}" height="${dh}" fill="#edf5e6" rx="8"/>`;
+
+      /* ── 2. Grid ── */
+      const rangeX = b.maxX - b.minX || 1;
+      const rangeY = b.maxY - b.minY || 1;
+      const stepX  = niceStep(rangeX);
+      const stepY  = niceStep(rangeY);
+      let grid = '', gridLabels = '';
+
+      for(let v = Math.ceil(b.minX/stepX)*stepX; v <= b.maxX+stepX*.01; v = Math.round((v+stepX)*1e10)/1e10){
+        const sx = toSVG(v, 0, b).sx;
+        if(sx < MAP_PAD-1 || sx > SVG_W-MAP_PAD+1) continue;
+        grid       += `<line x1="${f(sx)}" y1="${MAP_PAD}" x2="${f(sx)}" y2="${SVG_H-MAP_PAD}" stroke="#d8e8ce" stroke-width="1"/>`;
+        gridLabels += `<text x="${f(sx)}" y="${SVG_H-MAP_PAD+14}" text-anchor="middle" fill="#aac096" font-family="JetBrains Mono,monospace" font-size="9">${round1(v)}</text>`;
+      }
+      for(let v = Math.ceil(b.minY/stepY)*stepY; v <= b.maxY+stepY*.01; v = Math.round((v+stepY)*1e10)/1e10){
+        const sy = toSVG(0, v, b).sy;
+        if(sy < MAP_PAD-1 || sy > SVG_H-MAP_PAD+1) continue;
+        grid       += `<line x1="${MAP_PAD}" y1="${f(sy)}" x2="${SVG_W-MAP_PAD}" y2="${f(sy)}" stroke="#d8e8ce" stroke-width="1"/>`;
+        gridLabels += `<text x="${MAP_PAD-6}" y="${f(sy+3.5)}" text-anchor="end" fill="#aac096" font-family="JetBrains Mono,monospace" font-size="9">${round1(v)}</text>`;
+      }
+      document.getElementById('m-minor').innerHTML = '';
+      document.getElementById('m-major').innerHTML  = grid + gridLabels;
+
+      /* ── 3. Path arrows ── */
+      /* arrowSegment(fromSVG, toSVG, fromGrid, toGrid, colour, strokeW, dash)
+         - fromSVG/toSVG : {sx,sy}  — SVG pixel positions (used for drawing)
+         - fromGrid/toGrid: {x,y}   — grid coords (used for distance label only)
+         The arrow shaft starts PIN_R px from the source centre and ends
+         PIN_R px from the target centre, so it touches both pin edges cleanly. */
+      const USER_R = 7;   // user dot radius in SVG px
+      const SHOP_R = 7;   // shop dot radius in SVG px
+      const ARROW_HEAD = 7; // arrowhead length in px
+
+      function arrowSegment(p1, p2, g1, g2, col, sw, dash){
+        const dx  = p2.sx - p1.sx;
+        const dy  = p2.sy - p1.sy;
+        const len = Math.sqrt(dx*dx + dy*dy);
+        if(len < 2) return '';
+        const ux3 = dx/len, uy3 = dy/len; // unit vector from p1 → p2
+
+        /* Shaft: start just outside source radius, end just outside target radius */
+        const fromR = p1.isUser ? USER_R + 2 : SHOP_R + 2;
+        const toR   = p2.isUser ? USER_R + 2 : SHOP_R + 2;
+        const x1 = p1.sx + ux3 * fromR;
+        const y1 = p1.sy + uy3 * fromR;
+        const x2 = p2.sx - ux3 * (toR + ARROW_HEAD); // shaft ends before arrowhead
+        const y2 = p2.sy - uy3 * (toR + ARROW_HEAD);
+
+        /* Arrowhead triangle — tip points exactly at pin edge */
+        const tipX = p2.sx - ux3 * toR;
+        const tipY = p2.sy - uy3 * toR;
+        const hw   = 4; // half-width of arrowhead base
+        const bx   = tipX - ux3 * ARROW_HEAD;
+        const by   = tipY - uy3 * ARROW_HEAD;
+        const lx   = bx + (-uy3) * hw,  ly  = by + ux3 * hw;
+        const rx2  = bx +   uy3  * hw,  ry2 = by - ux3 * hw;
+
+        /* Distance label — grid distance, shown perpendicular to midpoint */
+        const gridDist = dist(g1.x, g1.y, g2.x, g2.y);
+        const mx  = (x1+x2)/2, my  = (y1+y2)/2;
+        const off = 11; // perpendicular offset
+        const lbx = mx + (-uy3)*off, lby = my + ux3*off;
+        const lw  = 28;
+
+        return `<line x1="${f(x1)}" y1="${f(y1)}" x2="${f(x2)}" y2="${f(y2)}"
+            stroke="${col}" stroke-width="${sw}" stroke-dasharray="${dash}" opacity=".9" stroke-linecap="round"/>
+          <polygon points="${f(tipX)},${f(tipY)} ${f(lx)},${f(ly)} ${f(rx2)},${f(ry2)}" fill="${col}" opacity=".95"/>
+          <rect x="${f(lbx-lw/2)}" y="${f(lby-7)}" width="${lw}" height="14" rx="4"
+            fill="white" stroke="${col}" stroke-width=".8" opacity=".93"/>
+          <text x="${f(lbx)}" y="${f(lby+4)}" text-anchor="middle" fill="${col}"
+            font-family="JetBrains Mono,monospace" font-size="8.5" font-weight="600">${gridDist.toFixed(1)}</text>`;
+      }
+
+      let pathSvg = '';
+      if(drawPath && pathStops.length > 0 && hasPos){
+        /* Build SVG waypoints: user → shop1 → shop2 → … */
+        const userP  = { ...toSVG(ux, uy, b), isUser: true };
+        const shopPs = pathStops.map(s => ({ ...toSVG(s.xcoordinate, s.ycoordinate, b), isUser: false }));
+        const pts    = [userP, ...shopPs];
+        const gPts   = [{ x:ux, y:uy }, ...pathStops.map(s => ({ x:s.xcoordinate, y:s.ycoordinate }))];
+
+        for(let i = 0; i < pts.length-1; i++){
+          const col = i === 0 ? '#3b82f6' : '#f97316';
+          const sw  = i === 0 ? 2 : 1.8;
+          const da  = i === 0 ? '6,3' : '5,3';
+          pathSvg  += arrowSegment(pts[i], pts[i+1], gPts[i], gPts[i+1], col, sw, da);
+        }
+      }
+      document.getElementById('m-path').innerHTML = pathSvg;
+
+      /* ── 4. Shop markers — match by name against pathStops since pathStops may not have ids ── */
+      const SR  = 7;
+      const SHL = 11;
+      let shopSvg = '';
+
+      allShops.forEach(s => {
+        const {sx, sy} = toSVG(s.xcoordinate, s.ycoordinate, b);
+        const isHl    = s.id === hlShopId;
+        const pathIdx = pathStops.findIndex(p =>
+          (p.id != null && p.id === s.id) ||
+          (p.name && p.name.toLowerCase() === s.name.toLowerCase())
+        );
+        const inPath  = pathIdx >= 0;
+        const r       = isHl ? SHL : SR;
+        const col     = isHl ? '#f97316' : inPath ? '#f97316' : '#2da653';
+
+        /* Step badge — shown only for route shops */
+        const badge = inPath ? `
+          <circle cx="${f(sx+r+1)}" cy="${f(sy-r)}" r="7" fill="${col}" stroke="white" stroke-width="1.2"/>
+          <text x="${f(sx+r+1)}" y="${f(sy-r+3.5)}" text-anchor="middle" fill="white"
+            font-family="JetBrains Mono,monospace" font-size="8" font-weight="700">${pathIdx+1}</text>` : '';
+
+        /* Name pill — always visible for route/highlighted shops, hidden by default for others */
+        const lw2     = s.name.length * 6.5 + 12;
+        const lx3     = sx - lw2/2;
+        const labelId = `lbl-${s.id}`;
+        /* Show name permanently for route shops or highlighted; for others it's hidden until hover */
+        const labelVis = (inPath || isHl) ? 'visible' : 'hidden';
+
+        shopSvg += `
+          <g style="cursor:pointer"
+             onclick="clickPin(${s.id},'${s.name}',${s.xcoordinate},${s.ycoordinate})"
+             onmouseenter="document.getElementById('${labelId}').setAttribute('visibility','visible')"
+             onmouseleave="${inPath||isHl ? '' : `document.getElementById('${labelId}').setAttribute('visibility','hidden')`}">
+            <circle cx="${f(sx)}" cy="${f(sy)}" r="${r+8}" fill="${col}" opacity=".06"/>
+            <circle cx="${f(sx)}" cy="${f(sy)}" r="${r}" fill="${col}" stroke="white" stroke-width="1.8"/>
+            <circle cx="${f(sx-r*.3)}" cy="${f(sy-r*.3)}" r="${f(r*.3)}" fill="white" opacity=".7"/>
+            ${badge}
+            <g id="${labelId}" visibility="${labelVis}">
+              <rect x="${f(lx3)}" y="${f(sy-r-19)}" width="${f(lw2)}" height="15" rx="5"
+                fill="${inPath?'#fff4ed':'white'}" stroke="${col}" stroke-width="1"/>
+              <text x="${f(sx)}" y="${f(sy-r-9)}" text-anchor="middle" fill="${col}"
+                font-family="Outfit,sans-serif" font-size="10" font-weight="700">${s.name}</text>
+            </g>
+            <text x="${f(sx)}" y="${f(sy+r+11)}" text-anchor="middle" fill="#9ab08a"
+              font-family="JetBrains Mono,monospace" font-size="7.5">(${s.xcoordinate},${s.ycoordinate})</text>
+          </g>`;
+      });
+      document.getElementById('m-shops').innerHTML = shopSvg;
+
+      /* ── 5. User marker — only render when position has been entered ── */
+      if(hasPos){
+        const {sx: usx, sy: usy} = toSVG(ux, uy, b);
+        document.getElementById('m-user').innerHTML = `
+          <circle cx="${f(usx)}" cy="${f(usy)}" r="16" fill="#3b82f6" opacity=".08">
+            <animate attributeName="r" values="12;18;12" dur="2.5s" repeatCount="indefinite"/>
+            <animate attributeName="opacity" values=".10;.04;.10" dur="2.5s" repeatCount="indefinite"/>
+          </circle>
+          <circle cx="${f(usx)}" cy="${f(usy)}" r="7" fill="#3b82f6" stroke="white" stroke-width="2"/>
+          <circle cx="${f(usx-2)}" cy="${f(usy-2)}" r="2" fill="white" opacity=".8"/>
+          <rect x="${f(usx-13)}" y="${f(usy-25)}" width="26" height="13" rx="4"
+            fill="#eff6ff" stroke="#93c5fd" stroke-width=".9"/>
+          <text x="${f(usx)}" y="${f(usy-16)}" text-anchor="middle" fill="#1d4ed8"
+            font-family="Outfit,sans-serif" font-size="8.5" font-weight="800">YOU</text>
+          <text x="${f(usx)}" y="${f(usy+18)}" text-anchor="middle" fill="#93c5fd"
+            font-family="JetBrains Mono,monospace" font-size="7.5">(${ux},${uy})</text>`;
+      } else {
+        document.getElementById('m-user').innerHTML = '';
+      }
+    }
+
+    /* Formatting helpers */
+    function f(n){ return (+n).toFixed(1); }
+    function round1(v){ return +(Math.round(v*10)/10); }
+
+    function clickPin(id,name,x,y){
+      hlShopId = hlShopId===id ? null : id;
+      toast(`${name}  ·  (${x}, ${y})`,'info',3000);
+      renderMap();
+    }
+
+    /* ── Map: hover tooltip only — map is VIEW-ONLY, no click-to-move ── */
+    (function initMap(){
+      document.addEventListener('DOMContentLoaded', ()=>{
+        const vp = document.getElementById('map-vp');
+        if(!vp) return;
+
+        vp.addEventListener('mousemove', e=>{
+          const rect = vp.getBoundingClientRect();
+          const svgX = (e.clientX - rect.left)  / rect.width  * SVG_W;
+          const svgY = (e.clientY - rect.top)   / rect.height * SVG_H;
+          const {userX: ux, userY: uy} = getCoords();
+          const b  = getBounds(ux, uy);
+          const dw = SVG_W - MAP_PAD*2, dh = SVG_H - MAP_PAD*2;
+          const rxr = b.maxX - b.minX || 1, ryr = b.maxY - b.minY || 1;
+          const gx = +(Math.round((b.minX + (svgX - MAP_PAD) / dw * rxr) * 10) / 10).toFixed(1);
+          const gy = +(Math.round((b.minY + (SVG_H - MAP_PAD - svgY) / dh * ryr) * 10) / 10).toFixed(1);
+          document.getElementById('hover-coords').textContent = `x: ${gx}  y: ${gy}`;
+        });
+
+        vp.style.cursor = 'default'; // no crosshair since map is view-only
+
+        loadShopsOnMap();
+      });
+    })();
+</script>
+</body>
+</html>
