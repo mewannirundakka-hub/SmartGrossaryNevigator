@@ -196,4 +196,7 @@ public class ShopService {
     }
 
 
+    public List<Shop> recommendAdvanced(double lat, double lon) {
+        return List.of(); // temporary safe return
+    }
 }

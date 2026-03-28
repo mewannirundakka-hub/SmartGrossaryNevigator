@@ -76,6 +76,13 @@
             <scope>provided</scope>  <!-- ✅ Correct -->
         </dependency>
 
+        <!-- testing dependency h2 -->
+        <dependency>
+            <groupId>com.h2database</groupId>
+            <artifactId>h2</artifactId>
+            <scope>test</scope>
+        </dependency>
+
     </dependencies>
 
     <build>
